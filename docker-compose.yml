@@ -13,8 +13,9 @@ services:
       - sql_repl_network
     volumes:
       - publisher_data:/var/opt/mssql
+      - ./publisher-setup.sql:/var/opt/mssql/publisher-setup.sql:ro
     healthcheck:
-      test: /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "YourStrong@Passw0rd" -Q "SELECT 1" || exit 1
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "YourStrong@Passw0rd" -Q "SELECT 1" -C || exit 1
       interval: 10s
       timeout: 3s
       retries: 10
@@ -34,8 +35,9 @@ services:
       - sql_repl_network
     volumes:
       - subscriber_data:/var/opt/mssql
+      - ./subscriber-setup.sql:/var/opt/mssql/subscriber-setup.sql:ro
     healthcheck:
-      test: /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "YourStrong@Passw0rd" -Q "SELECT 1" || exit 1
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "YourStrong@Passw0rd" -Q "SELECT 1" -C || exit 1
       interval: 10s
       timeout: 3s
       retries: 10

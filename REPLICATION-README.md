@@ -1,302 +1,282 @@
-# SQL Server Replication Environment using Docker Compose
+# Docker Compose を使用した SQL Server レプリケーション環境
 
-This repository provides a complete local development environment for testing SQL Server replication using Docker Compose. The setup includes a Publisher and Subscriber configuration with transactional replication.
+このリポジトリは、Docker Compose を使用して SQL Server レプリケーションをテストするための完全なローカル開発環境を提供します。セットアップには、トランザクションレプリケーションを使用した Publisher と Subscriber の構成が含まれています。
 
-## Table of Contents
-- [Prerequisites](#prerequisites)
-- [Project Structure](#project-structure)
-- [Quick Start](#quick-start)
-- [Detailed Setup Instructions](#detailed-setup-instructions)
-- [Testing Replication](#testing-replication)
-- [Troubleshooting](#troubleshooting)
-- [Cleanup](#cleanup)
+## 目次
+- [前提条件](#前提条件)
+- [プロジェクト構造](#プロジェクト構造)
+- [クイックスタート](#クイックスタート)
+- [詳細なセットアップ手順](#詳細なセットアップ手順)
+- [レプリケーションのテスト](#レプリケーションのテスト)
+- [トラブルシューティング](#トラブルシューティング)
+- [クリーンアップ](#クリーンアップ)
 
-## Prerequisites
+## 前提条件
 
-Before you begin, ensure you have the following installed on your system:
-- Docker (version 20.10 or later)
-- Docker Compose (version 1.29 or later)
-- A SQL client tool (SQL Server Management Studio, Azure Data Studio, or sqlcmd)
+開始する前に、システムに以下がインストールされていることを確認してください：
+- Docker (バージョン 20.10 以降)
+- Docker Compose (バージョン 1.29 以降)
+- SQL クライアントツール (SQL Server Management Studio、Azure Data Studio、または sqlcmd)
 
-## Project Structure
+## プロジェクト構造
 
 ```
 .
-├── docker-compose.yml           # Docker Compose configuration for Publisher and Subscriber
-├── publisher-setup.sql          # SQL script to configure the Publisher
-├── subscriber-setup.sql         # SQL script to configure the Subscriber
-└── README.md                    # This file
+├── docker-compose.yml           # Publisher と Subscriber の Docker Compose 設定
+├── publisher-setup.sql          # Publisher を設定する SQL スクリプト
+├── subscriber-setup.sql         # Subscriber を設定する SQL スクリプト
+├── README.md                    # メインの README
+└── VERIFICATION-RESULTS.md      # 検証結果
 ```
 
-## Quick Start
+## クイックスタート
 
-Follow these steps to quickly set up and test SQL Server replication:
+SQL Server レプリケーションを迅速にセットアップしてテストするには、次の手順に従います：
 
 ```bash
-# 1. Start the containers
+# 1. コンテナを起動
 docker-compose up -d
 
-# 2. Wait for SQL Server containers to be ready (about 30-60 seconds)
+# 2. SQL Server コンテナの準備が整うまで待機（約30〜60秒）
 docker-compose ps
 
-# 3. Configure the Publisher
-docker exec -it sqlpublisher /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -i /var/opt/mssql/publisher-setup.sql
+# 3. Subscriber を設定
+docker exec -it sqlsubscriber /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -i /var/opt/mssql/subscriber-setup.sql -C
 
-# 4. Configure the Subscriber
-docker exec -it sqlsubscriber /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -i /var/opt/mssql/subscriber-setup.sql
+# 4. Publisher を設定
+docker exec -it sqlpublisher /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -i /var/opt/mssql/publisher-setup.sql -C
 
-# 5. Test the replication (see Testing Replication section)
+# 5. スナップショットを生成
+docker exec sqlpublisher /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d ReplicationDB -Q "EXEC sp_startpublication_snapshot @publication = N'ProductPublication';" -C
+
+# 6. レプリケーションをテスト（「レプリケーションのテスト」セクションを参照）
 ```
 
-## Detailed Setup Instructions
+## 詳細なセットアップ手順
 
-### Step 1: Start the Docker Environment
+### ステップ 1: Docker 環境を起動
 
-Start both SQL Server containers using Docker Compose:
+Docker Compose を使用して両方の SQL Server コンテナを起動します：
 
 ```bash
 docker-compose up -d
 ```
 
-This command will:
-- Create a Docker network named `sql_repl_network`
-- Start two SQL Server 2019 containers:
-  - **sqlpublisher** (accessible on port 1433)
-  - **sqlsubscriber** (accessible on port 1434)
-- Enable SQL Server Agent on both instances (required for replication)
+このコマンドは以下を実行します：
+- `sql_repl_network` という名前の Docker ネットワークを作成
+- 2つの SQL Server 2019 コンテナを起動：
+  - **sqlpublisher** (ポート 1433 でアクセス可能)
+  - **sqlsubscriber** (ポート 1434 でアクセス可能)
+- 両方のインスタンスで SQL Server Agent を有効化（レプリケーションに必要）
 
-### Step 2: Verify Containers are Running
+### ステップ 2: コンテナが実行中であることを確認
 
-Check the status of the containers:
+コンテナのステータスを確認します：
 
 ```bash
 docker-compose ps
 ```
 
-Wait until both containers show as "healthy". You can also check the logs:
+両方のコンテナが「healthy」と表示されるまで待ちます。ログも確認できます：
 
 ```bash
-# Check Publisher logs
+# Publisher のログを確認
 docker-compose logs sqlpublisher
 
-# Check Subscriber logs
+# Subscriber のログを確認
 docker-compose logs sqlsubscriber
 ```
 
-### Step 3: Configure the Publisher
+### ステップ 3: Subscriber を設定
 
-The `publisher-setup.sql` script will:
-1. Create the `ReplicationDB` database
-2. Create a sample `Products` table with test data
-3. Configure the distribution database
-4. Create a transactional publication named `ProductPublication`
+`subscriber-setup.sql` スクリプトは以下を実行します：
+1. Subscriber に `ReplicationDB` データベースを作成
+2. `Products` テーブルのスキーマを作成
 
-Execute the script by copying it to the Publisher container and running it:
+スクリプトを実行します（SQLスクリプトは自動的にマウントされています）：
 
 ```bash
-# Copy the SQL script to the Publisher container
-docker cp publisher-setup.sql sqlpublisher:/var/opt/mssql/publisher-setup.sql
-
-# Execute the script
-docker exec -it sqlpublisher /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -i /var/opt/mssql/publisher-setup.sql
+docker exec -it sqlsubscriber /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -i /var/opt/mssql/subscriber-setup.sql -C
 ```
 
-Alternatively, you can connect using your SQL client:
-- Server: `localhost,1433`
-- Username: `sa`
-- Password: `YourStrong@Passw0rd`
+または、SQL クライアントを使用して接続することもできます：
+- サーバー: `localhost,1434`
+- ユーザー名: `sa`
+- パスワード: `YourStrong@Passw0rd`
 
-Then open and execute `publisher-setup.sql`.
+次に `subscriber-setup.sql` を開いて実行します。
 
-### Step 4: Generate the Snapshot
+### ステップ 4: Publisher を設定
 
-After configuring the Publisher, you need to generate a snapshot:
+`publisher-setup.sql` スクリプトは以下を実行します：
+1. `ReplicationDB` データベースを作成
+2. テストデータを含むサンプル `Products` テーブルを作成
+3. 配布データベースを設定
+4. `ProductPublication` という名前のトランザクションパブリケーションを作成
+5. Subscriber へのプッシュサブスクリプションを作成
+
+スクリプトを実行します：
 
 ```bash
-docker exec -it sqlpublisher /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -Q "EXEC sp_startpublication_snapshot @publication = N'ProductPublication';"
+docker exec -it sqlpublisher /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -i /var/opt/mssql/publisher-setup.sql -C
 ```
 
-Wait a few seconds for the snapshot to be generated. You can check the status:
+または、SQL クライアントを使用して接続することもできます：
+- サーバー: `localhost,1433`
+- ユーザー名: `sa`
+- パスワード: `YourStrong@Passw0rd`
+
+次に `publisher-setup.sql` を開いて実行します。
+
+### ステップ 5: スナップショットを生成
+
+Publisher を設定した後、スナップショットを生成する必要があります：
 
 ```bash
-docker exec -it sqlpublisher /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -Q "SELECT * FROM distribution.dbo.MSsnapshot_agents;"
+docker exec sqlpublisher /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d ReplicationDB -Q "EXEC sp_startpublication_snapshot @publication = N'ProductPublication';" -C
 ```
 
-### Step 5: Configure the Subscriber
-
-The `subscriber-setup.sql` script will:
-1. Create the `ReplicationDB` database on the Subscriber
-2. Add a pull subscription to the `ProductPublication`
-3. Configure the subscription agent
-
-Execute the script:
+スナップショットが生成されるまで数秒待ちます。ステータスを確認できます：
 
 ```bash
-# Copy the SQL script to the Subscriber container
-docker cp subscriber-setup.sql sqlsubscriber:/var/opt/mssql/subscriber-setup.sql
-
-# Execute the script
-docker exec -it sqlsubscriber /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -i /var/opt/mssql/subscriber-setup.sql
+docker exec sqlpublisher /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d distribution -Q "SELECT TOP 5 time, runstatus, comments FROM MSsnapshot_history ORDER BY time DESC;" -C
 ```
 
-Alternatively, connect using your SQL client:
-- Server: `localhost,1434`
-- Username: `sa`
-- Password: `YourStrong@Passw0rd`
+## レプリケーションのテスト
 
-Then open and execute `subscriber-setup.sql`.
+### 初期データレプリケーションの確認
 
-### Step 6: Start the Subscription Agent
-
-The pull subscription agent should start automatically through SQL Server Agent. You can verify it's running:
+1. **Subscriber のデータを確認:**
 
 ```bash
-# Check if the subscription agent job exists and is running
-docker exec -it sqlsubscriber /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d msdb -Q "SELECT name, enabled, date_created FROM sysjobs WHERE name LIKE '%ProductPublication%';"
+# Subscriber に接続して Products テーブルをクエリ
+docker exec -it sqlsubscriber /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d ReplicationDB -Q "SELECT * FROM Products;" -C
 ```
 
-If needed, you can manually start the pull subscription agent:
+Publisher に挿入された同じ 5 つの製品が表示されるはずです。
+
+### リアルタイムレプリケーションのテスト
+
+1. **Publisher に新しい製品を挿入:**
 
 ```bash
-# Start the pull subscription agent
-docker exec -it sqlsubscriber /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d ReplicationDB -Q "EXEC sp_start_job @job_name = (SELECT name FROM msdb.dbo.sysjobs WHERE name LIKE '%ProductPublication%');"
+docker exec -it sqlpublisher /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d ReplicationDB -Q "INSERT INTO Products (ProductName, Price) VALUES ('Webcam', 149.99);" -C
 ```
 
-## Testing Replication
-
-### Verify Initial Data Replication
-
-1. **Check data on the Subscriber:**
+2. **Publisher で既存の製品を更新:**
 
 ```bash
-# Connect to Subscriber and query the Products table
-docker exec -it sqlsubscriber /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d ReplicationDB -Q "SELECT * FROM Products;"
+docker exec -it sqlpublisher /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d ReplicationDB -Q "UPDATE Products SET Price = 899.99 WHERE ProductName = 'Laptop';" -C
 ```
 
-You should see the same 5 products that were inserted on the Publisher.
-
-### Test Real-Time Replication
-
-1. **Insert a new product on the Publisher:**
+3. **Publisher で製品を削除:**
 
 ```bash
-docker exec -it sqlpublisher /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d ReplicationDB -Q "INSERT INTO Products (ProductName, Price) VALUES ('Webcam', 149.99);"
+docker exec -it sqlpublisher /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d ReplicationDB -Q "DELETE FROM Products WHERE ProductName = 'Mouse';" -C
 ```
 
-2. **Update an existing product on the Publisher:**
+4. **Subscriber で変更を確認（レプリケーションのために数秒待機）:**
 
 ```bash
-docker exec -it sqlpublisher /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d ReplicationDB -Q "UPDATE Products SET Price = 899.99 WHERE ProductName = 'Laptop';"
+docker exec -it sqlsubscriber /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d ReplicationDB -Q "SELECT * FROM Products ORDER BY ProductID;" -C
 ```
 
-3. **Delete a product on the Publisher:**
+Subscriber は Publisher で行われたすべての変更を反映するはずです。
+
+### レプリケーションステータスの監視
+
+レプリケーションステータスとエラーを確認：
 
 ```bash
-docker exec -it sqlpublisher /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d ReplicationDB -Q "DELETE FROM Products WHERE ProductName = 'Mouse';"
+# Publisher 側 - Distribution Agent の履歴を確認
+docker exec sqlpublisher /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d distribution -Q "SELECT TOP 10 time, comments FROM MSdistribution_history ORDER BY time DESC;" -C
+
+# レプリケーションエラーを確認
+docker exec sqlpublisher /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d distribution -Q "SELECT * FROM MSrepl_errors ORDER BY time DESC;" -C
 ```
 
-4. **Verify changes on the Subscriber (wait a few seconds for replication):**
+## トラブルシューティング
 
+### よくある問題
+
+**1. コンテナが起動しない:**
+- Docker が実行中であることを確認
+- ポート 1433 と 1434 が利用可能か確認
+- コンテナログを確認: `docker-compose logs`
+
+**2. SQL Server Agent が実行されていない:**
 ```bash
-docker exec -it sqlsubscriber /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d ReplicationDB -Q "SELECT * FROM Products ORDER BY ProductID;"
+# Publisher で SQL Server Agent のステータスを確認
+docker exec sqlpublisher /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -Q "SELECT CASE WHEN EXISTS(SELECT 1 FROM sys.dm_exec_sessions WHERE program_name LIKE 'SQLAgent%') THEN 'Running' ELSE 'Not Running' END AS AgentStatus;" -C
+
+# 必要に応じて、エージェントジョブが存在することを確認
+docker exec sqlpublisher /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d msdb -Q "SELECT job_id, name, enabled FROM sysjobs WHERE name LIKE '%snapshot%' OR name LIKE '%repl%';" -C
 ```
 
-The Subscriber should reflect all changes made on the Publisher.
+**3. レプリケーションが動作しない:**
+- スナップショットが正常に生成されたことを確認
+- SQL Server Agent ジョブが実行中であることを確認
+- レプリケーションモニターでエラーを確認
+- 両方のコンテナが `sql_repl_network` 上で通信できることを確認
 
-### Monitor Replication Status
-
-Check replication status and any errors:
-
+**4. Publisher と Subscriber 間の接続問題:**
 ```bash
-# On Publisher - Check distribution database
-docker exec -it sqlpublisher /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d distribution -Q "SELECT * FROM MSreplication_monitordata;"
-
-# Check for replication errors
-docker exec -it sqlpublisher /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d distribution -Q "SELECT * FROM MSrepl_errors ORDER BY time DESC;"
+# ネットワーク接続をテスト
+docker exec sqlsubscriber ping sqlpublisher
 ```
 
-## Troubleshooting
-
-### Common Issues
-
-**1. Containers not starting:**
-- Ensure Docker is running
-- Check if ports 1433 and 1434 are available
-- Review container logs: `docker-compose logs`
-
-**2. SQL Server Agent not running:**
+**5. 詳細なレプリケーションエラーを表示:**
 ```bash
-# Check SQL Server Agent status on Publisher
-docker exec -it sqlpublisher /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -Q "SELECT CASE WHEN EXISTS(SELECT 1 FROM sys.dm_exec_sessions WHERE program_name LIKE 'SQLAgent%') THEN 'Running' ELSE 'Not Running' END AS AgentStatus;"
-
-# If needed, verify agent jobs exist
-docker exec -it sqlpublisher /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d msdb -Q "SELECT job_id, name, enabled FROM sysjobs WHERE name LIKE '%snapshot%' OR name LIKE '%repl%';"
+docker exec sqlpublisher /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d distribution -Q "SELECT TOP 5 time, error_id, comments FROM MSdistribution_history WHERE error_id <> 0 ORDER BY time DESC;" -C
 ```
 
-**3. Replication not working:**
-- Verify the snapshot was generated successfully
-- Check SQL Server Agent jobs are running
-- Review replication monitor for errors
-- Ensure both containers can communicate on the `sql_repl_network`
+### 環境をリセットしてやり直す
 
-**4. Connection issues between Publisher and Subscriber:**
-```bash
-# Test network connectivity
-docker exec -it sqlsubscriber ping sqlpublisher
-```
-
-**5. View detailed replication errors:**
-```bash
-docker exec -it sqlpublisher /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -Q "EXEC sp_replmonitorhelppublication @publisher = N'sqlpublisher';"
-```
-
-### Reset and Start Over
-
-If you need to completely reset the environment:
+環境を完全にリセットする必要がある場合：
 
 ```bash
-# Stop and remove containers, networks, and volumes
+# コンテナ、ネットワーク、およびボリュームを停止して削除
 docker-compose down -v
 
-# Start fresh
+# 新たに開始
 docker-compose up -d
 
-# Re-run the setup scripts
+# セットアップスクリプトを再実行
 ```
 
-## Cleanup
+## クリーンアップ
 
-To stop and remove all containers, networks, and volumes:
+すべてのコンテナ、ネットワーク、およびボリュームを停止して削除するには：
 
 ```bash
-# Stop and remove everything
+# すべてを停止して削除
 docker-compose down -v
 
-# Or just stop the containers (keeping data)
+# またはコンテナのみを停止（データを保持）
 docker-compose stop
 ```
 
-To remove just the containers but keep the volumes:
+コンテナのみを削除してボリュームを保持するには：
 
 ```bash
 docker-compose down
 ```
 
-## Additional Resources
+## 追加リソース
 
-- [SQL Server Replication Documentation](https://docs.microsoft.com/en-us/sql/relational-databases/replication/sql-server-replication)
-- [Docker Compose Documentation](https://docs.docker.com/compose/)
-- [SQL Server on Docker](https://docs.microsoft.com/en-us/sql/linux/sql-server-linux-overview)
+- [SQL Server レプリケーションドキュメント](https://docs.microsoft.com/ja-jp/sql/relational-databases/replication/sql-server-replication)
+- [Docker Compose ドキュメント](https://docs.docker.com/compose/)
+- [Docker 上の SQL Server](https://docs.microsoft.com/ja-jp/sql/linux/sql-server-linux-overview)
 
-## Security Notes
+## セキュリティに関する注意
 
-⚠️ **Important:** This setup uses a simple password (`YourStrong@Passw0rd`) for demonstration purposes. In a production environment:
-- Use strong, unique passwords
-- Store passwords securely (e.g., using Docker secrets)
-- Configure proper network security
-- Enable SSL/TLS encryption for SQL Server connections
-- Follow the principle of least privilege for SQL Server accounts
+⚠️ **重要:** このセットアップは、デモンストレーション目的で簡単なパスワード（`YourStrong@Passw0rd`）を使用しています。本番環境では：
+- 強力でユニークなパスワードを使用
+- パスワードを安全に保管（例: Docker secrets を使用）
+- 適切なネットワークセキュリティを設定
+- SQL Server 接続用の SSL/TLS 暗号化を有効化
+- SQL Server アカウントには最小権限の原則に従う
 
-## License
+## ライセンス
 
-This project is provided as-is for educational and development purposes.
+このプロジェクトは、教育および開発目的のために現状のまま提供されます。

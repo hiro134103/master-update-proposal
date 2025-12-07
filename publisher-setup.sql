@@ -1,12 +1,12 @@
 -- ================================================
--- SQL Server Replication Publisher Setup Script
+-- SQL Server レプリケーション Publisher セットアップスクリプト
 -- ================================================
--- This script sets up the publisher, distribution database, and publication
+-- このスクリプトは、Publisher、配布データベース、およびパブリケーションをセットアップします
 
 USE master;
 GO
 
--- Create a sample database
+-- サンプルデータベースの作成
 IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = 'ReplicationDB')
 BEGIN
     CREATE DATABASE ReplicationDB;
@@ -21,7 +21,7 @@ GO
 USE ReplicationDB;
 GO
 
--- Create a sample table
+-- サンプルテーブルの作成
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Products')
 BEGIN
     CREATE TABLE Products (
@@ -38,7 +38,7 @@ BEGIN
 END
 GO
 
--- Insert sample data
+-- サンプルデータの挿入
 IF NOT EXISTS (SELECT * FROM Products)
 BEGIN
     INSERT INTO Products (ProductName, Price) VALUES 
@@ -56,22 +56,22 @@ END
 GO
 
 -- ================================================
--- Configure Distribution Database
+-- 配布データベースの設定
 -- ================================================
 USE master;
 GO
 
--- Install the distributor
+-- ディストリビューターのインストール
 EXEC sp_adddistributor @distributor = @@SERVERNAME, @password = N'YourStrong@Passw0rd';
 GO
 
--- Create the distribution database
+-- 配布データベースの作成
 EXEC sp_adddistributiondb 
     @database = N'distribution',
     @security_mode = 1;
 GO
 
--- Configure the publisher to use the distributor
+-- Publisher がディストリビューターを使用するように設定
 EXEC sp_adddistpublisher 
     @publisher = @@SERVERNAME,
     @distribution_db = N'distribution',
@@ -86,19 +86,19 @@ PRINT 'Distribution database configured successfully.';
 GO
 
 -- ================================================
--- Create Publication
+-- パブリケーションの作成
 -- ================================================
 USE ReplicationDB;
 GO
 
--- Enable the database for transactional publication
+-- データベースでトランザクションパブリケーションを有効化
 EXEC sp_replicationdboption 
     @dbname = N'ReplicationDB',
     @optname = N'publish',
     @value = N'true';
 GO
 
--- Add transactional publication
+-- トランザクションパブリケーションの追加
 EXEC sp_addpublication 
     @publication = N'ProductPublication',
     @description = N'Transactional publication of Products table',
@@ -126,7 +126,7 @@ EXEC sp_addpublication
     @enabled_for_het_sub = N'false';
 GO
 
--- Add the snapshot agent
+-- スナップショットエージェントの追加
 EXEC sp_addpublication_snapshot 
     @publication = N'ProductPublication',
     @frequency_type = 1,
@@ -144,7 +144,7 @@ EXEC sp_addpublication_snapshot
     @publisher_security_mode = 1;
 GO
 
--- Add the Products table as an article
+-- Products テーブルをアーティクルとして追加
 EXEC sp_addarticle 
     @publication = N'ProductPublication',
     @article = N'Products',
@@ -169,7 +169,58 @@ PRINT 'Publication "ProductPublication" created successfully.';
 PRINT 'Publisher setup completed!';
 GO
 
--- Display publication information
+-- ================================================
+-- Subscriber へのプッシュサブスクリプションの追加
+-- ================================================
+USE [ReplicationDB];
+GO
+
+-- Subscriber サーバーの追加
+EXEC sp_addsubscriber 
+    @subscriber = N'sqlsubscriber',
+    @type = 0,
+    @description = N'Subscriber server';
+GO
+
+-- プッシュサブスクリプションの追加
+EXEC sp_addsubscription 
+    @publication = N'ProductPublication',
+    @subscriber = N'sqlsubscriber',
+    @destination_db = N'ReplicationDB',
+    @subscription_type = N'Push',
+    @sync_type = N'automatic',
+    @article = N'all',
+    @update_mode = N'read only',
+    @subscriber_type = 0;
+GO
+
+-- プッシュサブスクリプションエージェントの追加
+EXEC sp_addpushsubscription_agent 
+    @publication = N'ProductPublication',
+    @subscriber = N'sqlsubscriber',
+    @subscriber_db = N'ReplicationDB',
+    @job_login = NULL,
+    @job_password = NULL,
+    @subscriber_security_mode = 0,
+    @subscriber_login = N'sa',
+    @subscriber_password = N'YourStrong@Passw0rd',
+    @frequency_type = 64,
+    @frequency_interval = 1,
+    @frequency_relative_interval = 1,
+    @frequency_recurrence_factor = 0,
+    @frequency_subday = 4,
+    @frequency_subday_interval = 5,
+    @active_start_time_of_day = 0,
+    @active_end_time_of_day = 235959,
+    @active_start_date = 0,
+    @active_end_date = 0,
+    @dts_package_location = N'Distributor';
+GO
+
+PRINT 'Push subscription created successfully!';
+GO
+
+-- パブリケーション情報の表示
 SELECT 
     name AS PublicationName,
     description AS Description,

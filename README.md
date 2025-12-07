@@ -1,52 +1,56 @@
 # Master Update Proposal
 
-## Initial Project Description
-This project aims to demonstrate best practices in software development and effective management of resources.
+## 初期プロジェクト説明
+このプロジェクトは、ソフトウェア開発におけるベストプラクティスと効果的なリソース管理を実証することを目的としています。
 
-## Proposed Improvements
-- Enhance performance metrics.
-- Improve user interface for better user experience.
-- Implement more efficient algorithms to handle data processing.
+## 提案された改善点
+- パフォーマンス指標の強化
+- より良いユーザーエクスペリエンスのためのユーザーインターフェースの改善
+- データ処理を扱うためのより効率的なアルゴリズムの実装
 
-## SQL Server Replication Environment
+## SQL Server レプリケーション環境
 
-This repository now includes a complete Docker-based environment for testing SQL Server replication (Publisher/Subscriber setup).
+このリポジトリには、SQL Server レプリケーション（Publisher/Subscriber 構成）をテストするための完全な Docker ベースの環境が含まれています。
 
-### Quick Start
+### クイックスタート
 
-To get started with the SQL Server replication environment:
+SQL Server レプリケーション環境を開始するには：
 
-1. **Start the environment:**
+1. **環境を起動:**
    ```bash
    docker-compose up -d
    ```
 
-2. **Configure the Publisher:**
+2. **Publisher を設定:**
    ```bash
-   docker cp publisher-setup.sql sqlpublisher:/var/opt/mssql/
-   docker exec -it sqlpublisher /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -i /var/opt/mssql/publisher-setup.sql
+   docker exec -it sqlpublisher /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -i /var/opt/mssql/publisher-setup.sql -C
    ```
 
-3. **Configure the Subscriber:**
+3. **Subscriber を設定:**
    ```bash
-   docker cp subscriber-setup.sql sqlsubscriber:/var/opt/mssql/
-   docker exec -it sqlsubscriber /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -i /var/opt/mssql/subscriber-setup.sql
+   docker exec -it sqlsubscriber /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -i /var/opt/mssql/subscriber-setup.sql -C
    ```
 
-4. **Test the replication:**
+4. **スナップショットを開始:**
    ```bash
-   # Insert data on Publisher
-   docker exec -it sqlpublisher /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d ReplicationDB -Q "INSERT INTO Products (ProductName, Price) VALUES ('Webcam', 149.99);"
+   docker exec sqlpublisher /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d ReplicationDB -Q "EXEC sp_startpublication_snapshot @publication = N'ProductPublication';" -C
+   ```
+
+5. **レプリケーションをテスト:**
+   ```bash
+   # Publisher にデータを挿入
+   docker exec -it sqlpublisher /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d ReplicationDB -Q "INSERT INTO Products (ProductName, Price) VALUES ('Webcam', 149.99);" -C
    
-   # Verify on Subscriber
-   docker exec -it sqlsubscriber /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d ReplicationDB -Q "SELECT * FROM Products;"
+   # Subscriber で確認
+   docker exec -it sqlsubscriber /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d ReplicationDB -Q "SELECT * FROM Products;" -C
    ```
 
-For detailed instructions, troubleshooting, and advanced usage, please refer to [REPLICATION-README.md](REPLICATION-README.md).
+詳細な手順、トラブルシューティング、および高度な使用方法については、[REPLICATION-README.md](REPLICATION-README.md) を参照してください。
 
-### Files Included
+### 含まれるファイル
 
-- **docker-compose.yml**: Configures Publisher and Subscriber SQL Server containers
-- **publisher-setup.sql**: Sets up the publisher, distribution database, and publication
-- **subscriber-setup.sql**: Sets up the subscriber and subscription
-- **REPLICATION-README.md**: Comprehensive documentation with detailed setup instructions
+- **docker-compose.yml**: Publisher と Subscriber の SQL Server コンテナを設定
+- **publisher-setup.sql**: Publisher、配布データベース、およびパブリケーションをセットアップ
+- **subscriber-setup.sql**: Subscriber とサブスクリプションをセットアップ
+- **REPLICATION-README.md**: 詳細なセットアップ手順を含む包括的なドキュメント
+- **VERIFICATION-RESULTS.md**: レプリケーション検証結果
