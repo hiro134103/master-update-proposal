@@ -13,8 +13,8 @@ services:
       - sql_repl_network
     volumes:
       - publisher_data:/var/opt/mssql
-      - ./publisher-setup-push.sql:/var/opt/mssql/publisher-setup-push.sql:ro
-      - ./publisher-setup-pull.sql:/var/opt/mssql/publisher-setup-pull.sql:ro
+      - ./push-replication/publisher-setup.sql:/var/opt/mssql/push-publisher-setup.sql:ro
+      - ./pull-replication/publisher-setup.sql:/var/opt/mssql/pull-publisher-setup.sql:ro
     healthcheck:
       test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "YourStrong@Passw0rd" -Q "SELECT 1" -C || exit 1
       interval: 10s
@@ -36,8 +36,8 @@ services:
       - sql_repl_network
     volumes:
       - subscriber_data:/var/opt/mssql
-      - ./subscriber-setup-push.sql:/var/opt/mssql/subscriber-setup-push.sql:ro
-      - ./subscriber-setup-pull.sql:/var/opt/mssql/subscriber-setup-pull.sql:ro
+      - ./push-replication/subscriber-setup.sql:/var/opt/mssql/push-subscriber-setup.sql:ro
+      - ./pull-replication/subscriber-setup.sql:/var/opt/mssql/pull-subscriber-setup.sql:ro
     healthcheck:
       test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "YourStrong@Passw0rd" -Q "SELECT 1" -C || exit 1
       interval: 10s

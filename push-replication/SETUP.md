@@ -31,7 +31,7 @@ docker-compose ps
 Subscriber 側でデータベースとテーブルスキーマを作成します。
 
 ```powershell
-docker exec -it sqlsubscriber /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "YourStrong@Passw0rd" -i /var/opt/mssql/subscriber-setup-push.sql -C
+docker exec -it sqlsubscriber /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "YourStrong@Passw0rd" -i /var/opt/mssql/push-subscriber-setup.sql -C
 ```
 
 **期待される出力**:
@@ -46,7 +46,7 @@ Subscriber setup completed!
 Publisher 側で配布データベース、パブリケーション、およびプッシュサブスクリプションを作成します。
 
 ```powershell
-docker exec -it sqlpublisher /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "YourStrong@Passw0rd" -i /var/opt/mssql/publisher-setup-push.sql -C
+docker exec -it sqlpublisher /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "YourStrong@Passw0rd" -i /var/opt/mssql/push-publisher-setup.sql -C
 ```
 
 **期待される出力**:

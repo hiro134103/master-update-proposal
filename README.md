@@ -26,17 +26,17 @@
 - 中央集中管理で複数 Subscriber を一括制御
 - リアルタイム性が高い
 
-**セットアップ手順**: [SETUP-PUSH.md](SETUP-PUSH.md) を参照
+**セットアップ手順**: [push-replication/SETUP.md](push-replication/SETUP.md) を参照
 
 ```powershell
 # 1. コンテナ起動
 docker-compose up -d
 
 # 2. Subscriber セットアップ
-docker exec -it sqlsubscriber /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "YourStrong@Passw0rd" -i /var/opt/mssql/subscriber-setup-push.sql -C
+docker exec -it sqlsubscriber /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "YourStrong@Passw0rd" -i /var/opt/mssql/push-subscriber-setup.sql -C
 
 # 3. Publisher セットアップ
-docker exec -it sqlpublisher /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "YourStrong@Passw0rd" -i /var/opt/mssql/publisher-setup-push.sql -C
+docker exec -it sqlpublisher /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "YourStrong@Passw0rd" -i /var/opt/mssql/push-publisher-setup.sql -C
 
 # 4. スナップショット開始
 docker exec -it sqlpublisher /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "YourStrong@Passw0rd" -d ReplicationDB -Q "EXEC sp_startpublication_snapshot @publication = N'ProductPublication';" -C
@@ -53,20 +53,20 @@ docker exec -it sqlpublisher /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P
 - 各 Subscriber が独立して同期タイミングを制御
 - Subscriber がオフラインでも Publisher に影響なし
 
-**セットアップ手順**: [SETUP-PULL.md](SETUP-PULL.md) を参照
+**セットアップ手順**: [pull-replication/SETUP.md](pull-replication/SETUP.md) を参照
 
 ```powershell
 # 1. コンテナ起動
 docker-compose up -d
 
 # 2. Publisher セットアップ
-docker exec -it sqlpublisher /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "YourStrong@Passw0rd" -i /var/opt/mssql/publisher-setup-pull.sql -C
+docker exec -it sqlpublisher /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "YourStrong@Passw0rd" -i /var/opt/mssql/pull-publisher-setup.sql -C
 
 # 3. スナップショット作成
 docker exec -it sqlpublisher /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "YourStrong@Passw0rd" -d ReplicationDB -Q "EXEC sp_startpublication_snapshot @publication = N'ProductPublication';" -C
 
 # 4. Subscriber セットアップ
-docker exec -it sqlsubscriber /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "YourStrong@Passw0rd" -i /var/opt/mssql/subscriber-setup-pull.sql -C
+docker exec -it sqlsubscriber /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "YourStrong@Passw0rd" -i /var/opt/mssql/pull-subscriber-setup.sql -C
 
 # 5. Distribution Agent 実行（Subscriber 側）
 docker exec -it sqlsubscriber /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "YourStrong@Passw0rd" -Q "EXEC distribution.dbo.sp_MSdistribution_agent @publisher='publisher', @publisher_db='ReplicationDB', @publication='ProductPublication', @subscriber='subscriber', @subscriber_db='ReplicationDB', @subscription_type=1;" -C
@@ -109,14 +109,14 @@ docker exec -it sqlsubscriber /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -
 - **docker-compose.yml**: Publisher と Subscriber の SQL Server コンテナを設定
 
 **プッシュサブスクリプション用**:
-- **publisher-setup-push.sql**: Publisher、配布データベース、パブリケーション、およびプッシュサブスクリプションをセットアップ
-- **subscriber-setup-push.sql**: Subscriber のデータベースとテーブルスキーマをセットアップ
-- **SETUP-PUSH.md**: プッシュサブスクリプションの詳細セットアップ手順
+- **push-replication/publisher-setup.sql**: Publisher、配布データベース、パブリケーション、およびプッシュサブスクリプションをセットアップ
+- **push-replication/subscriber-setup.sql**: Subscriber のデータベースとテーブルスキーマをセットアップ
+- **push-replication/SETUP.md**: プッシュサブスクリプションの詳細セットアップ手順
 
 **プルサブスクリプション用**:
-- **publisher-setup-pull.sql**: Publisher、配布データベース、およびパブリケーションをセットアップ
-- **subscriber-setup-pull.sql**: Subscriber のデータベース、テーブル、およびプルサブスクリプションをセットアップ
-- **SETUP-PULL.md**: プルサブスクリプションの詳細セットアップ手順
+- **pull-replication/publisher-setup.sql**: Publisher、配布データベース、およびパブリケーションをセットアップ
+- **pull-replication/subscriber-setup.sql**: Subscriber のデータベース、テーブル、およびプルサブスクリプションをセットアップ
+- **pull-replication/SETUP.md**: プルサブスクリプションの詳細セットアップ手順
 
 **ドキュメント**:
 - **REPLICATION-README.md**: レプリケーションの概念と詳細な技術情報
