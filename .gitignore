@@ -1,0 +1,15 @@
+# Docker volumes and data
+*.log
+*.pid
+
+# Temporary files
+.DS_Store
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Environment files
+.env
+.env.local
