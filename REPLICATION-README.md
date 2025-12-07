@@ -5,7 +5,6 @@
 ## 目次
 - [前提条件](#前提条件)
 - [プロジェクト構造](#プロジェクト構造)
-- [レプリケーションアーキテクチャ](#レプリケーションアーキテクチャ)
 - [クイックスタート](#クイックスタート)
 - [詳細なセットアップ手順](#詳細なセットアップ手順)
 - [レプリケーションのテスト](#レプリケーションのテスト)
@@ -23,278 +22,57 @@
 
 ```
 .
-├── docker-compose.yml           # Publisher と Subscriber の Docker Compose 設定
-├── publisher-setup.sql          # Publisher を設定する SQL スクリプト
-├── subscriber-setup.sql         # Subscriber を設定する SQL スクリプト
-├── README.md                    # メインの README
-└── VERIFICATION-RESULTS.md      # 検証結果
+├── docker-compose.yml              # Publisher と Subscriber の Docker Compose 設定
+├── push-replication/               # プッシュサブスクリプション
+│   ├── SETUP.md                    # セットアップ手順
+│   ├── VERIFICATION-RESULTS.md     # 検証結果
+│   ├── publisher-setup.sql         # Publisher 設定スクリプト
+│   └── subscriber-setup.sql        # Subscriber 設定スクリプト
+├── pull-replication/               # プルサブスクリプション
+│   ├── SETUP.md                    # セットアップ手順
+│   ├── VERIFICATION-RESULTS.md     # 検証結果
+│   ├── publisher-setup.sql         # Publisher 設定スクリプト
+│   └── subscriber-setup.sql        # Subscriber 設定スクリプト
+├── ARCHITECTURE.md                 # アーキテクチャ詳細説明
+├── README.md                       # メインの README
+└── REPLICATION-README.md           # このファイル
 ```
 
-## レプリケーションアーキテクチャ
+## アーキテクチャ
 
-### プルサブスクリプションのデータフロー
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│ 中央サーバー（Publisher）                                      │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│ ①業務データベース                                             │
-│ ┌─────────────────┐                                         │
-│ │ ReplicationDB   │ ← アプリケーションがデータ更新            │
-│ │  - Products表   │                                         │
-│ └────────┬────────┘                                         │
-│          │トランザクションログに記録                           │
-│          ▼                                                   │
-│ ┌─────────────────┐                                         │
-│ │ログファイル       │                                         │
-│ └────────┬────────┘                                         │
-│          │                                                   │
-│          │②Log Reader Agentが監視・変更検知（常時動作）       │
-│          ▼                                                   │
-│ ┌─────────────────┐                                         │
-│ │ distribution    │ ← レプリケーション管理データベース         │
-│ │  - commands     │   変更内容を一時保存                     │
-│ │  - transactions │   保持期間: 72時間（デフォルト）          │
-│ └────────┬────────┘                                         │
-│          │                                                   │
-│          │③Subscriberからの要求に応答                        │
-│          │  「最後の同期以降の変更を返却」                     │
-└──────────┼──────────────────────────────────────────────────┘
-           │
-           │ネットワーク接続（Subscriber → Publisher）
-           │
-┌──────────┼──────────────────────────────────────────────────┐
-│          │部門サーバー（Subscriber）                          │
-├──────────┴──────────────────────────────────────────────────┤
-│                                                              │
-│ ④Distribution Agent（Subscriber側で動作）                    │
-│ ┌───────────────────────────────────────────┐               │
-│ │ - スケジュール実行（例: 9:00～、30分間隔） │               │
-│ │ - Publisherに接続して変更を要求           │               │
-│ │ - 取得した変更を適用                      │               │
-│ │ - 接続失敗時は次回リトライ                │               │
-│ └────────┬──────────────────────────────────┘               │
-│          │変更を適用                                         │
-│          ▼                                                   │
-│ ┌─────────────────┐                                         │
-│ │ ReplicationDB   │ ← 同期されたデータ                       │
-│ │  - Products表   │   （読み取り専用）                       │
-│ └─────────────────┘                                         │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### データベース構成
-
-#### Publisher（中央サーバー）のデータベース
-
-1. **ReplicationDB**（業務データベース）
-   - 役割: 実際のアプリケーションデータを格納
-   - 用途: ここにINSERT/UPDATE/DELETEが実行される
-   - 特徴: トランザクションログが自動生成される
-
-2. **distribution**（配布データベース）
-   - 役割: レプリケーション管理専用の一時ストレージ
-   - 用途: 
-     - Log Reader Agentが読み取った変更を保存
-     - どのSubscriberにどの変更を配信したか記録
-     - Distribution Agentがここから変更を取得
-   - 保持期間: デフォルト72時間
-   - 主要テーブル:
-     - `MSrepl_commands`: レプリケートするコマンド
-     - `MSrepl_transactions`: トランザクション情報
-     - `MSdistribution_history`: 配信履歴
-
-3. **msdb**（システムデータベース）
-   - 役割: SQL Server Agentのジョブ管理
-   - 用途: Log Reader Agent、Snapshot Agentのスケジュール管理
-
-#### Subscriber（部門サーバー）のデータベース
-
-1. **ReplicationDB**（同期データベース）
-   - 役割: Publisherから同期されたデータを格納
-   - 用途: 読み取り専用（通常）
-   - 特徴: Publisherと同じテーブル構造
-
-2. **msdb**（システムデータベース）
-   - 役割: Distribution Agentのジョブ管理
-   - 用途: 定期同期スケジュールの管理
-
-### データレプリケーションの流れ
-
-#### ステップ1: データ更新（Publisher側）
-```sql
--- アプリケーションが実行
-INSERT INTO ReplicationDB.dbo.Products 
-VALUES ('Tablet', 399.99);
-```
-- ReplicationDB の Products表に直接INSERT
-- SQL Serverのトランザクションログに自動記録
-
-#### ステップ2: Log Reader Agentが変更を検知
-- 動作: 常時バックグラウンドで監視
-- 処理フロー:
-  1. トランザクションログを読み取り
-  2. レプリケーション対象の変更を検出
-  3. distribution データベースに書き込み
-- 頻度: リアルタイム（数秒以内）
-
-#### ステップ3: Subscriberから変更を要求
-- タイミング: 定期実行（例: 30分間隔）
-- 処理フロー:
-  1. Distribution Agent（Subscriber側）が起動
-  2. Publisherの distribution データベースに接続
-  3. 最後に同期したトランザクションID以降の変更を要求
-  4. Publisherが該当する変更を返却
-
-#### ステップ4: Subscriberに変更を適用
-```sql
--- Distribution Agentが受け取った変更を自動実行
-INSERT INTO ReplicationDB.dbo.Products 
-VALUES ('Tablet', 399.99);
-```
-- トランザクションの順序性を保証
-- 適用結果をログに記録
-
-### プルサブスクリプションの特徴
-
-#### distribution データベースの役割
-- **キューイングシステム**: 変更を一時保存するバッファ
-- **非同期処理**: Subscriberが取得するまで保持
-- **スケーラビリティ**: 複数Subscriberがそれぞれのペースで取得可能
-- **耐障害性**: 72時間以内の停止であればデータ損失なし
-
-#### 夜間停止時のタイムライン例
-```
-【中央サーバー（Publisher）】 常時稼働
-18:00 ────────────────────────── 09:00 ─────→
-       データ更新が distribution に蓄積
-
-【部門サーバー（Subscriber）】 夜間停止
-18:00 [停止] ────── 08:30 [起動] 09:00 [同期実行]
-                                    ↑
-                          夜間の変更をまとめて取得
-```
-
-1. 18:00 - 部門サーバー停止
-2. 18:00-翌9:00 - 中央サーバーで発生した変更はdistributionに蓄積
-3. 08:30 - 部門サーバー起動（同期はまだ実行されない）
-4. 09:00 - Distribution Agent実行 → 夜間の全変更を取得・適用
-5. 09:30以降 - 30分ごとに継続同期
+レプリケーションの技術的な詳細については、以下をご覧ください：
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - プッシュ/プルサブスクリプションのデータフロー、データベース構成、比較表
 
 ## クイックスタート
 
-SQL Server レプリケーションを迅速にセットアップしてテストするには、次の手順に従います：
+### 1. Docker環境の起動
 
 ```bash
-# 1. コンテナを起動
+# コンテナを起動
 docker-compose up -d
 
-# 2. SQL Server コンテナの準備が整うまで待機（約30〜60秒）
+# コンテナの準備を待つ（約30-60秒）
 docker-compose ps
-
-# 3. Subscriber を設定
-docker exec -it sqlsubscriber /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -i /var/opt/mssql/subscriber-setup.sql -C
-
-# 4. Publisher を設定
-docker exec -it sqlpublisher /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -i /var/opt/mssql/publisher-setup.sql -C
-
-# 5. スナップショットを生成
-docker exec sqlpublisher /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d ReplicationDB -Q "EXEC sp_startpublication_snapshot @publication = N'ProductPublication';" -C
-
-# 6. レプリケーションをテスト（「レプリケーションのテスト」セクションを参照）
 ```
+
+### 2. レプリケーション設定
+
+**プッシュサブスクリプション:**
+詳細は [push-replication/SETUP.md](push-replication/SETUP.md) を参照
+
+**プルサブスクリプション:**
+詳細は [pull-replication/SETUP.md](pull-replication/SETUP.md) を参照
+
+---
 
 ## 詳細なセットアップ手順
 
-### ステップ 1: Docker 環境を起動
+各レプリケーション方式の詳しいセットアップ手順は、それぞれのフォルダにある SETUP.md を参照してください：
 
-Docker Compose を使用して両方の SQL Server コンテナを起動します：
+- **プッシュサブスクリプション**: [push-replication/SETUP.md](push-replication/SETUP.md)
+- **プルサブスクリプション**: [pull-replication/SETUP.md](pull-replication/SETUP.md)
 
-```bash
-docker-compose up -d
-```
-
-このコマンドは以下を実行します：
-- `sql_repl_network` という名前の Docker ネットワークを作成
-- 2つの SQL Server 2019 コンテナを起動：
-  - **sqlpublisher** (ポート 1433 でアクセス可能)
-  - **sqlsubscriber** (ポート 1434 でアクセス可能)
-- 両方のインスタンスで SQL Server Agent を有効化（レプリケーションに必要）
-
-### ステップ 2: コンテナが実行中であることを確認
-
-コンテナのステータスを確認します：
-
-```bash
-docker-compose ps
-```
-
-両方のコンテナが「healthy」と表示されるまで待ちます。ログも確認できます：
-
-```bash
-# Publisher のログを確認
-docker-compose logs sqlpublisher
-
-# Subscriber のログを確認
-docker-compose logs sqlsubscriber
-```
-
-### ステップ 3: Subscriber を設定
-
-`subscriber-setup.sql` スクリプトは以下を実行します：
-1. Subscriber に `ReplicationDB` データベースを作成
-2. `Products` テーブルのスキーマを作成
-
-スクリプトを実行します（SQLスクリプトは自動的にマウントされています）：
-
-```bash
-docker exec -it sqlsubscriber /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -i /var/opt/mssql/subscriber-setup.sql -C
-```
-
-または、SQL クライアントを使用して接続することもできます：
-- サーバー: `localhost,1434`
-- ユーザー名: `sa`
-- パスワード: `YourStrong@Passw0rd`
-
-次に `subscriber-setup.sql` を開いて実行します。
-
-### ステップ 4: Publisher を設定
-
-`publisher-setup.sql` スクリプトは以下を実行します：
-1. `ReplicationDB` データベースを作成
-2. テストデータを含むサンプル `Products` テーブルを作成
-3. 配布データベースを設定
-4. `ProductPublication` という名前のトランザクションパブリケーションを作成
-5. Subscriber へのプッシュサブスクリプションを作成
-
-スクリプトを実行します：
-
-```bash
-docker exec -it sqlpublisher /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -i /var/opt/mssql/publisher-setup.sql -C
-```
-
-または、SQL クライアントを使用して接続することもできます：
-- サーバー: `localhost,1433`
-- ユーザー名: `sa`
-- パスワード: `YourStrong@Passw0rd`
-
-次に `publisher-setup.sql` を開いて実行します。
-
-### ステップ 5: スナップショットを生成
-
-Publisher を設定した後、スナップショットを生成する必要があります：
-
-```bash
-docker exec sqlpublisher /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d ReplicationDB -Q "EXEC sp_startpublication_snapshot @publication = N'ProductPublication';" -C
-```
-
-スナップショットが生成されるまで数秒待ちます。ステータスを確認できます：
-
-```bash
-docker exec sqlpublisher /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d distribution -Q "SELECT TOP 5 time, runstatus, comments FROM MSsnapshot_history ORDER BY time DESC;" -C
-```
+---
 
 ## レプリケーションのテスト
 
