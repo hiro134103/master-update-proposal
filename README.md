@@ -70,33 +70,6 @@ docker exec -it sqlsubscriber /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -
 
 ---
 
-### 含まれるファイル
-
-**フォルダ構成**:
-```
-master-update-proposal/
-├── docker-compose.yml              # Docker環境設定
-├── README.md                       # このファイル
-├── REPLICATION-README.md           # レプリケーション技術詳細
-├── push-replication/               # プッシュサブスクリプション
-│   ├── SETUP.md                   # セットアップ手順
-│   ├── VERIFICATION-RESULTS.md    # 検証結果
-### 比較表
-
-| 項目 | プッシュサブスクリプション | プルサブスクリプション |
-|------|---------------------|----------------------|
-| **Distribution Agent の場所** | Publisher側 | Subscriber側 |
-| **接続方向** | Publisher → Subscriber | Subscriber → Publisher |
-| **配信タイミング** | Publisher主導（5分間隔） | Subscriber主導（30分間隔推奨） |
-| **Subscriber停止時** | 配信エラーが発生 | 次回起動時に自動取得 |
-| **起動順序依存** | Subscriberが先に起動不可 | どちらが先でも問題なし |
-| **リアルタイム性** | 高い | 中程度 |
-| **管理の複雑度** | 低い（中央管理） | 中程度（各Subscriber設定） |
-
-詳しい技術比較は **[ARCHITECTURE.md](ARCHITECTURE.md)** を参照してください。
-
----
-
 ## クイックスタート
 
 ### 1. Docker環境を起動
