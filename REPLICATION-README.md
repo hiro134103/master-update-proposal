@@ -148,13 +148,19 @@ Then open and execute `subscriber-setup.sql`.
 
 ### Step 6: Start the Subscription Agent
 
-Start the replication agent to begin synchronization:
+The pull subscription agent should start automatically through SQL Server Agent. You can verify it's running:
 
 ```bash
-docker exec -it sqlsubscriber /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d ReplicationDB -Q "EXEC sp_addsubscription @publication = N'ProductPublication', @subscriber = N'sqlpublisher', @destination_db = N'ReplicationDB', @subscription_type = N'Push', @sync_type = N'automatic', @article = N'all', @update_mode = N'read only', @subscriber_type = 0;"
+# Check if the subscription agent job exists and is running
+docker exec -it sqlsubscriber /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d msdb -Q "SELECT name, enabled, date_created FROM sysjobs WHERE name LIKE '%ProductPublication%';"
 ```
 
-Or manually start the pull subscription agent job through SQL Server Agent.
+If needed, you can manually start the pull subscription agent:
+
+```bash
+# Start the pull subscription agent
+docker exec -it sqlsubscriber /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d ReplicationDB -Q "EXEC sp_start_job @job_name = (SELECT name FROM msdb.dbo.sysjobs WHERE name LIKE '%ProductPublication%');"
+```
 
 ## Testing Replication
 
@@ -220,8 +226,11 @@ docker exec -it sqlpublisher /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P '
 
 **2. SQL Server Agent not running:**
 ```bash
-# Start SQL Server Agent on Publisher
-docker exec -it sqlpublisher /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -Q "EXEC sp_MSgetagentparameterlist @agent_type = 1;"
+# Check SQL Server Agent status on Publisher
+docker exec -it sqlpublisher /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -Q "SELECT CASE WHEN EXISTS(SELECT 1 FROM sys.dm_exec_sessions WHERE program_name LIKE 'SQLAgent%') THEN 'Running' ELSE 'Not Running' END AS AgentStatus;"
+
+# If needed, verify agent jobs exist
+docker exec -it sqlpublisher /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d msdb -Q "SELECT job_id, name, enabled FROM sysjobs WHERE name LIKE '%snapshot%' OR name LIKE '%repl%';"
 ```
 
 **3. Replication not working:**
