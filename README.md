@@ -105,22 +105,42 @@ docker exec -it sqlsubscriber /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -
 
 ### 含まれるファイル
 
+**フォルダ構成**:
+```
+master-update-proposal/
+├── docker-compose.yml              # Docker環境設定
+├── README.md                       # このファイル
+├── REPLICATION-README.md           # レプリケーション技術詳細
+├── push-replication/               # プッシュサブスクリプション
+│   ├── SETUP.md                   # セットアップ手順
+│   ├── VERIFICATION-RESULTS.md    # 検証結果
+│   ├── publisher-setup.sql        # Publisherセットアップスクリプト
+│   └── subscriber-setup.sql       # Subscriberセットアップスクリプト
+└── pull-replication/               # プルサブスクリプション
+    ├── SETUP.md                   # セットアップ手順
+    ├── VERIFICATION-RESULTS.md    # 検証結果
+    ├── publisher-setup.sql        # Publisherセットアップスクリプト
+    └── subscriber-setup.sql       # Subscriberセットアップスクリプト
+```
+
 **Docker 環境**:
 - **docker-compose.yml**: Publisher と Subscriber の SQL Server コンテナを設定
 
-**プッシュサブスクリプション用**:
-- **push-replication/publisher-setup.sql**: Publisher、配布データベース、パブリケーション、およびプッシュサブスクリプションをセットアップ
-- **push-replication/subscriber-setup.sql**: Subscriber のデータベースとテーブルスキーマをセットアップ
-- **push-replication/SETUP.md**: プッシュサブスクリプションの詳細セットアップ手順
+**プッシュサブスクリプション用** (`push-replication/`):
+- **publisher-setup.sql**: Publisher、配布データベース、パブリケーション、およびプッシュサブスクリプションをセットアップ
+- **subscriber-setup.sql**: Subscriber のデータベースとテーブルスキーマをセットアップ
+- **SETUP.md**: プッシュサブスクリプションの詳細セットアップ手順
+- **VERIFICATION-RESULTS.md**: プッシュサブスクリプションの検証結果
 
-**プルサブスクリプション用**:
-- **pull-replication/publisher-setup.sql**: Publisher、配布データベース、およびパブリケーションをセットアップ
-- **pull-replication/subscriber-setup.sql**: Subscriber のデータベース、テーブル、およびプルサブスクリプションをセットアップ
-- **pull-replication/SETUP.md**: プルサブスクリプションの詳細セットアップ手順
+**プルサブスクリプション用** (`pull-replication/`):
+- **publisher-setup.sql**: Publisher、配布データベース、およびパブリケーションをセットアップ
+- **subscriber-setup.sql**: Subscriber のデータベース、テーブル、およびプルサブスクリプションをセットアップ
+- **SETUP.md**: プルサブスクリプションの詳細セットアップ手順
+- **VERIFICATION-RESULTS.md**: プルサブスクリプションの検証結果
 
 **ドキュメント**:
+- **README.md**: プロジェクト概要と両方式のクイックスタートガイド
 - **REPLICATION-README.md**: レプリケーションの概念と詳細な技術情報
-- **VERIFICATION-RESULTS.md**: プッシュサブスクリプションでの検証結果
 
 ---
 
