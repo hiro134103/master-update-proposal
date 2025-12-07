@@ -43,13 +43,13 @@ GO
 -- ================================================
 
 -- Publisher へのリンクサーバーの作成（必要に応じて）
-IF NOT EXISTS (SELECT * FROM sys.servers WHERE name = 'publisher')
+IF NOT EXISTS (SELECT * FROM sys.servers WHERE name = 'sqlpublisher')
 BEGIN
     EXEC sp_addlinkedserver 
-        @server = 'publisher',
+        @server = 'sqlpublisher',
         @srvproduct = '',
         @provider = 'SQLNCLI',
-        @datasrc = 'publisher,1433';
+        @datasrc = 'sqlpublisher,1433';
     PRINT 'Linked server to Publisher created.';
 END
 ELSE
@@ -60,7 +60,7 @@ GO
 
 -- プルサブスクリプションの追加
 EXEC sp_addpullsubscription 
-    @publisher = N'publisher',
+    @publisher = N'sqlpublisher',
     @publisher_db = N'ReplicationDB',
     @publication = N'ProductPublication',
     @independent_agent = N'true',
@@ -72,13 +72,13 @@ GO
 
 -- プルサブスクリプションエージェントの追加
 EXEC sp_addpullsubscription_agent 
-    @publisher = N'publisher',
+    @publisher = N'sqlpublisher',
     @publisher_db = N'ReplicationDB',
     @publication = N'ProductPublication',
-    @distributor = N'publisher',
-    @distributor_security_mode = 1,
-    @distributor_login = N'',
-    @distributor_password = NULL,
+    @distributor = N'sqlpublisher',
+    @distributor_security_mode = 0,
+    @distributor_login = N'sa',
+    @distributor_password = N'YourStrong@Passw0rd',
     @enabled_for_syncmgr = N'false',
     @frequency_type = 64,
     @frequency_interval = 0,
@@ -89,30 +89,9 @@ EXEC sp_addpullsubscription_agent
     @active_start_time_of_day = 0,
     @active_end_time_of_day = 235959,
     @active_start_date = 20000101,
-    @active_end_date = 99991231,
-    @alt_snapshot_folder = N'',
-    @working_directory = N'',
-    @use_ftp = N'false',
-    @job_login = NULL,
-    @job_password = NULL,
-    @publication_type = 0,
-    @publisher_security_mode = 1,
-    @publisher_login = N'',
-    @publisher_password = NULL;
+    @active_end_date = 99991231;
 GO
 
 PRINT 'Pull subscription created successfully on Subscriber.';
 PRINT 'Subscriber setup completed!';
-GO
-
--- サブスクリプション情報の表示
-SELECT 
-    publisher AS Publisher,
-    publisher_db AS PublisherDB,
-    publication AS Publication,
-    subscriber_db AS SubscriberDB,
-    subscription_type AS SubscriptionType,
-    update_mode AS UpdateMode
-FROM 
-    dbo.MSsubscription_properties;
 GO

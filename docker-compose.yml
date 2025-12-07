@@ -13,6 +13,7 @@ services:
       - sql_repl_network
     volumes:
       - publisher_data:/var/opt/mssql
+      - snapshot_share:/var/opt/mssql/ReplData
       - ./push-replication/publisher-setup.sql:/var/opt/mssql/push-publisher-setup.sql:ro
       - ./pull-replication/publisher-setup.sql:/var/opt/mssql/pull-publisher-setup.sql:ro
     healthcheck:
@@ -36,6 +37,7 @@ services:
       - sql_repl_network
     volumes:
       - subscriber_data:/var/opt/mssql
+      - snapshot_share:/var/opt/mssql/ReplData
       - ./push-replication/subscriber-setup.sql:/var/opt/mssql/push-subscriber-setup.sql:ro
       - ./pull-replication/subscriber-setup.sql:/var/opt/mssql/pull-subscriber-setup.sql:ro
     healthcheck:
@@ -52,3 +54,4 @@ networks:
 volumes:
   publisher_data:
   subscriber_data:
+  snapshot_share:
