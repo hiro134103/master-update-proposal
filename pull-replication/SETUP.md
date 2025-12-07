@@ -265,6 +265,47 @@ docker exec -it sqlsubscriber /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -
 - ✅ **スケーラビリティ**: 複数の Subscriber を簡単に追加可能
 - ✅ **負荷分散**: Publisher 側の負荷が軽減
 
+## 実運用での推奨構成
+
+### 夜間PC電源断する部門サーバーの場合
+
+**想定シナリオ:**
+- 中央サーバー（Publisher）: 常時稼働
+- 部門サーバー（Subscriber）: 夜間電源断、朝出社時に起動
+- 部門側が先に出社してPCを起動する可能性あり
+
+**推奨設定:**
+
+```sql
+-- subscriber-setup.sql の sp_addpullsubscription_agent で以下のように設定
+@frequency_type = 4,                      -- 毎日
+@active_start_time_of_day = 90000,       -- 09:00:00（中央サーバー起動後の時刻）
+@frequency_subday = 4,                    -- 分単位
+@frequency_subday_interval = 30           -- 30分間隔
+```
+
+**動作:**
+1. 毎日9:00に最初の同期実行（夜間の変更を取得）
+2. その後は30分ごとに自動同期
+3. 部門サーバーが先に起動しても問題なし（9:00の実行時には中央サーバーも起動済み）
+4. 接続失敗時は自動リトライ（次の30分後に再実行）
+
+**メリット:**
+- ⏰ 確実な同期タイミング（中央サーバー起動後に実行）
+- 🔄 定期的な自動更新（業務時間中）
+- 🛡️ 起動順序に依存しない設計
+- 📊 夜間停止中は実行されない（無駄なエラーなし）
+
+### 更新頻度の調整
+
+業務要件に応じて `@frequency_subday_interval` を調整：
+
+| 更新頻度 | 設定値 | 用途 |
+|---------|-------|------|
+| 15分間隔 | `@frequency_subday_interval = 15` | 高頻度更新が必要 |
+| 30分間隔 | `@frequency_subday_interval = 30` | 標準的な同期 |
+| 1時間間隔 | `@frequency_subday_interval = 60` | 低頻度で十分 |
+
 ## 参考情報
 
 詳細な検証結果は `VERIFICATION-RESULTS.md` の「プルサブスクリプション検証結果」セクションを参照してください。
