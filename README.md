@@ -8,6 +8,7 @@
 
 - **[REPLICATION-README.md](REPLICATION-README.md)** - Docker環境のセットアップとテスト手順
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - レプリケーションアーキテクチャの詳細説明
+- **[SSMS-GUI-SETUP.md](SSMS-GUI-SETUP.md)** - SQL Server Management Studio (GUI) での設定方法
 - **[push-replication/](push-replication/)** - プッシュサブスクリプション関連ファイル
 - **[pull-replication/](pull-replication/)** - プルサブスクリプション関連ファイル
 
@@ -94,6 +95,7 @@ docker-compose ps  # コンテナの状態確認
 ├── README.md                       # このファイル
 ├── REPLICATION-README.md           # 詳細セットアップガイド
 ├── ARCHITECTURE.md                 # アーキテクチャ説明
+├── SSMS-GUI-SETUP.md               # SSMS GUI 操作ガイド
 ├── push-replication/
 │   ├── SETUP.md
 │   ├── VERIFICATION-RESULTS.md
