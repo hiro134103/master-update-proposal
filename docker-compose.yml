@@ -1,0 +1,50 @@
+services:
+  sqlpublisher:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    container_name: sqlpublisher
+    hostname: sqlpublisher
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=YourStrong@Passw0rd
+      - MSSQL_AGENT_ENABLED=true
+    ports:
+      - "1433:1433"
+    networks:
+      - sql_repl_network
+    volumes:
+      - publisher_data:/var/opt/mssql
+    healthcheck:
+      test: /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "YourStrong@Passw0rd" -Q "SELECT 1" || exit 1
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  sqlsubscriber:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    container_name: sqlsubscriber
+    hostname: sqlsubscriber
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=YourStrong@Passw0rd
+      - MSSQL_AGENT_ENABLED=true
+    ports:
+      - "1434:1433"
+    networks:
+      - sql_repl_network
+    volumes:
+      - subscriber_data:/var/opt/mssql
+    healthcheck:
+      test: /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "YourStrong@Passw0rd" -Q "SELECT 1" || exit 1
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+networks:
+  sql_repl_network:
+    driver: bridge
+
+volumes:
+  publisher_data:
+  subscriber_data:
